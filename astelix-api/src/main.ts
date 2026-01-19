@@ -6,7 +6,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true,
   });
 
@@ -19,7 +19,10 @@ async function bootstrap(): Promise<void> {
   );
 
   app.setGlobalPrefix('api');
-  await app.listen(3000);
+  
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`✓ ASTELIX running on port ${port}`);
 }
 
 bootstrap().catch((err) => {
