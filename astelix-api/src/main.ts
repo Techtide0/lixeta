@@ -5,8 +5,18 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
+  const allowedOrigins = [
+    'http://localhost:5173', // Local development
+    'http://localhost:3000', // Local API
+    'https://lixeta.onrender.com', // Production frontend
+  ];
+
+  if (process.env.CORS_ORIGIN) {
+    allowedOrigins.push(process.env.CORS_ORIGIN);
+  }
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   });
 
@@ -19,7 +29,6 @@ async function bootstrap(): Promise<void> {
   );
 
   app.setGlobalPrefix('api');
-  
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`✓ ASTELIX running on port ${port}`);
