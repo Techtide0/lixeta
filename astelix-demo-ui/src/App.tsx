@@ -1,4 +1,11 @@
 import React, { useState } from "react";
+import MessageLifecyclePanel from "./components/MessageLifecyclePanel";
+import ChannelBadge from "./components/ChannelBadge";
+import TimelineWithDelay from "./components/TimelineWithDelay";
+import ExplanationPanel from "./components/ExplanationPanel";
+import DemoStatusBanner from "./components/DemoStatusBanner";
+import PresenterControls from "./components/PresenterControls";
+import { TimelineEvent as TimelineEventType, MessageLifecycle } from "./types/demo";
 
 type ScenarioId =
   | "dual-time"
@@ -574,6 +581,7 @@ const App = () => {
   const [metadata, setMetadata] = useState<Metadata | null>(null);
   const [engineSteps, setEngineSteps] = useState<EngineStep[]>([]);
   const [currentEventIndex, setCurrentEventIndex] = useState(-1);
+  const [demoComplete, setDemoComplete] = useState(false);
 
   const handleRunScenario = async (scenarioId: ScenarioId) => {
     setSelectedScenario(scenarioId);
@@ -582,6 +590,7 @@ const App = () => {
     setEvents([]);
     setMetadata(null);
     setCurrentEventIndex(-1);
+    setDemoComplete(false);
     setEngineSteps(getEngineSteps(scenarioId));
 
     try {
@@ -599,6 +608,7 @@ const App = () => {
         setEvents(stagedEvents);
         setCurrentEventIndex(i);
       }
+      setDemoComplete(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to run demo");
       console.error("Demo error:", err);
@@ -694,19 +704,22 @@ const App = () => {
               Time-Aware Messaging & Action Intelligence
             </p>
           </div>
-          <div
-            style={{
-              padding: "6px 12px",
-              background: "rgba(168, 85, 247, 0.1)",
-              border: "1px solid rgba(168, 85, 247, 0.2)",
-              borderRadius: "6px",
-            }}
-          >
-            <span
-              style={{ fontSize: "12px", fontWeight: "500", color: "#c084fa" }}
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <PresenterControls onRunAll={() => handleRunScenario("dual-time")} />
+            <div
+              style={{
+                padding: "6px 12px",
+                background: "rgba(168, 85, 247, 0.1)",
+                border: "1px solid rgba(168, 85, 247, 0.2)",
+                borderRadius: "6px",
+              }}
             >
-              Demo Mode • Read-only
-            </span>
+              <span
+                style={{ fontSize: "12px", fontWeight: "500", color: "#c084fa" }}
+              >
+                Demo Mode • Read-only
+              </span>
+            </div>
           </div>
         </div>
       </header>
@@ -815,8 +828,21 @@ const App = () => {
           </div>
 
           <div className="content">
+            {metadata && (
+              <MessageLifecyclePanel
+                lifecycle={{
+                  id: `msg-${Date.now()}`,
+                  utcTime: metadata.utcTime,
+                  senderLocal: metadata.senderLocal,
+                  receiverLocal: metadata.receiverLocal,
+                  status: metadata.status,
+                }}
+              />
+            )}
+
             <div
               style={{
+                marginTop: metadata ? "16px" : 0,
                 background: "rgba(17, 24, 39, 0.5)",
                 border: "1px solid #1f2937",
                 borderRadius: "8px",
@@ -836,93 +862,66 @@ const App = () => {
                 Event Timeline
               </h2>
 
-              <div className="timeline-container">
-                {error ? (
-                  <div style={{ textAlign: "center", padding: "64px 0" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        margin: "0 auto 12px",
-                        color: "#f87171",
-                        opacity: 0.5,
-                      }}
-                    >
-                      <AlertCircleIcon />
-                    </div>
-                    <p style={{ fontSize: "14px", color: "#f87171" }}>
-                      {error}
-                    </p>
-                    <p
-                      style={{
-                        fontSize: "12px",
-                        color: "#6b7280",
-                        marginTop: "8px",
-                      }}
-                    >
-                      Try selecting a different scenario
-                    </p>
-                  </div>
-                ) : events.length === 0 && !loading ? (
+              <TimelineWithDelay events={events.map(e => ({
+                relativeTime: e.relativeTime,
+                message: e.message,
+                type: e.type,
+              }))} />
+
+              {error ? (
+                <div style={{ textAlign: "center", padding: "64px 0" }}>
                   <div
                     style={{
-                      textAlign: "center",
-                      padding: "64px 0",
-                      color: "#6b7280",
+                      display: "flex",
+                      justifyContent: "center",
+                      margin: "0 auto 12px",
+                      color: "#f87171",
+                      opacity: 0.5,
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        margin: "0 auto 12px",
-                        opacity: 0.3,
-                      }}
-                    >
-                      <ClockIcon />
-                    </div>
-                    <p style={{ fontSize: "14px" }}>
-                      Select a scenario to begin
-                    </p>
+                    <AlertCircleIcon />
                   </div>
-                ) : (
-                  events.map((event, index) => (
-                    <div
-                      key={index}
-                      className={`timeline-event ${getEventColor(event.type)}`}
-                      style={{ animation: "slideIn 0.3s ease-out" }}
-                    >
-                      <div className="event-icon">
-                        {getEventIcon(event.type)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "baseline",
-                            gap: "8px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              fontFamily: "monospace",
-                              color: "#6b7280",
-                            }}
-                          >
-                            [{event.relativeTime}]
-                          </span>
-                          <span style={{ fontSize: "14px", color: "#e5e7eb" }}>
-                            {event.message}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                  <p style={{ fontSize: "14px", color: "#f87171" }}>
+                    {error}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      marginTop: "8px",
+                    }}
+                  >
+                    Try selecting a different scenario
+                  </p>
+                </div>
+              ) : events.length === 0 && !loading ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "64px 0",
+                    color: "#6b7280",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      margin: "0 auto 12px",
+                      opacity: 0.3,
+                    }}
+                  >
+                    <ClockIcon />
+                  </div>
+                  <p style={{ fontSize: "14px" }}>
+                    Select a scenario to begin
+                  </p>
+                </div>
+              ) : null}
             </div>
+
+            {currentEventIndex >= 0 && (
+              <ExplanationPanel currentEvent={events[currentEventIndex]} />
+            )}
           </div>
         </div>
 
@@ -1150,6 +1149,10 @@ const App = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {demoComplete && (
+          <DemoStatusBanner status="Execution Complete ✓" />
         )}
       </div>
 
