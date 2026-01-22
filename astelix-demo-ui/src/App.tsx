@@ -1,11 +1,18 @@
+/// <reference types="./vite-env.d.ts" />
 import React, { useState } from "react";
 import MessageLifecyclePanel from "./components/MessageLifecyclePanel";
-import ChannelBadge from "./components/ChannelBadge";
 import TimelineWithDelay from "./components/TimelineWithDelay";
 import ExplanationPanel from "./components/ExplanationPanel";
 import DemoStatusBanner from "./components/DemoStatusBanner";
 import PresenterControls from "./components/PresenterControls";
-import { TimelineEvent as TimelineEventType, MessageLifecycle } from "./types/demo";
+import { runDemoScenario } from "./services/demoApi";
+import {
+  DelayStatusBanner,
+  RuleExplanationPanel,
+  ChannelOrchestrationPanel,
+  APIAuthPanel,
+  DemoScriptGuide,
+} from "./components/MissingFeatures";
 
 type ScenarioId =
   | "dual-time"
@@ -26,14 +33,6 @@ interface Metadata {
   rule: string;
   action: string;
   status: string;
-}
-
-interface EngineStep {
-  step: number;
-  title: string;
-  description: string;
-  triggerEventIndex: number;
-  renderArtifact?: () => React.ReactElement;
 }
 
 const SCENARIOS = [
@@ -123,455 +122,60 @@ function parseDelay(relativeTime: string): number {
   return 0;
 }
 
-// API Service (Mock for demo purposes)
-async function runDemoScenario(scenario: ScenarioId) {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  const mockData: Record<ScenarioId, any> = {
-    "dual-time": {
-      utcTime: new Date().toISOString(),
-      sender: { timezone: "America/New_York", localTime: "2:30 PM EST" },
-      receiver: { timezone: "Europe/London", localTime: "7:30 PM GMT" },
-      status: "delivered",
-    },
-    "behavior-reminder": {
-      triggeredAt: new Date().toISOString(),
-      rule: "no_reply_10min",
-      action: "send_reminder",
-      status: "triggered",
-    },
-    "fintech-login": {
-      actions: [
-        { message: "Welcome popup displayed" },
-        { message: "Guidance tour initiated" },
-      ],
-    },
-    "active-hours": {
-      sentAt: new Date().toISOString(),
-      receiverTimezone: "America/Los_Angeles",
-      deliveryWindow: "9 AM - 6 PM",
-      status: "delayed",
-      scheduledFor: "Tomorrow at 9:00 AM PST",
-    },
-  };
-
-  const data = mockData[scenario];
-
-  return {
-    timeline: transformToTimeline(scenario, data),
-    metadata: extractMetadata(scenario, data),
-  };
-}
-
-function transformToTimeline(scenario: ScenarioId, data: any): TimelineEvent[] {
-  const events: TimelineEvent[] = [];
-
+function getRuleCondition(scenario: ScenarioId, metadata: Metadata): string {
   switch (scenario) {
     case "dual-time":
-      events.push(
-        {
-          relativeTime: "T+0s",
-          message: `Sender (${data.sender.timezone}) initiated message`,
-          type: "info" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Resolved sender local time: ${data.sender.localTime}`,
-          type: "info" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Resolved receiver timezone: ${data.receiver.timezone}`,
-          type: "rule" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Receiver local time: ${data.receiver.localTime}`,
-          type: "info" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Message ${data.status}`,
-          type: "action" as const,
-        },
-      );
-      break;
-
+      return `Message received with different sender (${metadata.senderLocal}) and receiver (${metadata.receiverLocal}) timezones detected`;
     case "behavior-reminder":
-      events.push(
-        {
-          relativeTime: "T+0s",
-          message: "Message sent and delivered",
-          type: "action" as const,
-        },
-        {
-          relativeTime: "T+10m",
-          message: "No reply detected",
-          type: "warning" as const,
-        },
-        {
-          relativeTime: "T+10m",
-          message: `Rule triggered: ${data.rule}`,
-          type: "rule" as const,
-        },
-        {
-          relativeTime: "T+10m",
-          message: `Action queued: ${data.action}`,
-          type: "action" as const,
-        },
-        {
-          relativeTime: "T+10m",
-          message: `Action ${data.status}`,
-          type: "action" as const,
-        },
-      );
-      break;
-
+      return "Message delivered but no reply received within 10 minutes";
     case "fintech-login":
-      events.push(
-        {
-          relativeTime: "T+0s",
-          message: "User login event detected",
-          type: "info" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Action 1: ${data.actions[0].message}`,
-          type: "action" as const,
-        },
-        {
-          relativeTime: "T+5s",
-          message: `Action 2: ${data.actions[1].message}`,
-          type: "action" as const,
-        },
-        {
-          relativeTime: "T+5s",
-          message: "All actions executed",
-          type: "action" as const,
-        },
-      );
-      break;
-
+      return "User authentication event detected on fintech platform";
     case "active-hours":
-      events.push(
-        {
-          relativeTime: "T+0s",
-          message: `Message sent at ${data.sentAt}`,
-          type: "info" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Receiver timezone: ${data.receiverTimezone}`,
-          type: "info" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Active hours: ${data.deliveryWindow}`,
-          type: "rule" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Status: ${data.status}`,
-          type: "warning" as const,
-        },
-        {
-          relativeTime: "T+0s",
-          message: `Scheduled for: ${data.scheduledFor}`,
-          type: "action" as const,
-        },
-      );
-      break;
-  }
-
-  return events;
-}
-
-function extractMetadata(scenario: ScenarioId, data: any): Metadata {
-  switch (scenario) {
-    case "dual-time":
-      return {
-        utcTime: data.utcTime,
-        senderLocal: data.sender.localTime,
-        receiverLocal: data.receiver.localTime,
-        rule: "timezone_intelligence",
-        action: "message_resolved",
-        status: data.status,
-      };
-
-    case "behavior-reminder":
-      return {
-        utcTime: data.triggeredAt,
-        senderLocal: "N/A",
-        receiverLocal: "N/A",
-        rule: data.rule,
-        action: data.action,
-        status: data.status,
-      };
-
-    case "fintech-login":
-      return {
-        utcTime: new Date().toISOString(),
-        senderLocal: "N/A",
-        receiverLocal: "N/A",
-        rule: "login_event",
-        action: `${data.actions.length} actions executed`,
-        status: "executed",
-      };
-
-    case "active-hours":
-      return {
-        utcTime: data.sentAt,
-        senderLocal: "N/A",
-        receiverLocal: data.receiverTimezone,
-        rule: "active_hours_check",
-        action: "delivery_delayed",
-        status: data.status,
-      };
-
+      return `Current time falls outside active hours window (9 AM - 6 PM ${metadata.receiverLocal})`;
     default:
-      return {
-        utcTime: "",
-        senderLocal: "",
-        receiverLocal: "",
-        rule: "",
-        action: "",
-        status: "",
-      };
+      return "Condition not available";
   }
 }
 
-function getEngineSteps(scenario: ScenarioId): EngineStep[] {
+function getRuleReasoning(scenario: ScenarioId, metadata: Metadata): string {
   switch (scenario) {
     case "dual-time":
-      return [
-        {
-          step: 1,
-          title: "Resolve Time Zones",
-          description: "Sender and receiver time zones resolved",
-          triggerEventIndex: 1,
-          renderArtifact: () => (
-            <div className="artifact-card">
-              <div style={{ marginBottom: "8px", color: "#d1d5db" }}>
-                <strong>Timezone Detection:</strong>
-              </div>
-              <div style={{ fontSize: "13px", color: "#9ca3af" }}>
-                <div>Sender TZ: America/New_York</div>
-                <div>Receiver TZ: Europe/London</div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 2,
-          title: "Attach Dual-Time Metadata",
-          description: "UTC + local times attached",
-          triggerEventIndex: 3,
-          renderArtifact: () => (
-            <div className="artifact-card">
-              <div style={{ marginBottom: "8px", color: "#d1d5db" }}>
-                <strong>Time Metadata:</strong>
-              </div>
-              <div style={{ fontSize: "13px", fontFamily: "monospace", color: "#a3e635" }}>
-                <div>UTC: 2026-01-19T20:15:30Z</div>
-                <div>Sender: 3:15 PM EST</div>
-                <div>Receiver: 8:15 PM GMT</div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 3,
-          title: "Finalize Delivery",
-          description: "Message delivered",
-          triggerEventIndex: 4,
-          renderArtifact: () => (
-            <div className="artifact-message">
-              <div style={{ marginBottom: "8px", fontWeight: "600", color: "#e5e7eb" }}>
-                Message Artifact
-              </div>
-              <div style={{ padding: "12px", background: "rgba(0,0,0,0.2)", borderRadius: "4px", marginBottom: "8px", fontSize: "14px" }}>
-                Please approve this transaction
-              </div>
-              <span className="delivered">✓ Delivered</span>
-            </div>
-          ),
-        },
-      ];
-
+      return `The system automatically detects the sender's timezone (${metadata.senderLocal}) and receiver's timezone (${metadata.receiverLocal}), then resolves local times for both parties. This ensures the message is contextualized with time information relevant to each user's location.`;
     case "behavior-reminder":
-      return [
-        {
-          step: 1,
-          title: "Monitor Message State",
-          description: "Delivery and reply events observed",
-          triggerEventIndex: 0,
-          renderArtifact: () => (
-            <div className="artifact-card">
-              <div style={{ marginBottom: "8px", color: "#d1d5db" }}>
-                <strong>Message Status:</strong>
-              </div>
-              <div style={{ fontSize: "13px", color: "#9ca3af" }}>
-                <div>Status: <span style={{ color: "#4ade80" }}>Delivered</span></div>
-                <div>Awaiting reply...</div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 2,
-          title: "Evaluate Behavior Rule",
-          description: "No reply within 10 minutes",
-          triggerEventIndex: 1,
-          renderArtifact: () => (
-            <div className="artifact-card">
-              <div style={{ marginBottom: "8px", color: "#d1d5db" }}>
-                <strong>Rule Condition Met:</strong>
-              </div>
-              <div style={{ fontSize: "13px", color: "#fbbf24" }}>
-                <div>Rule: no_reply_10min</div>
-                <div>Trigger: Time window elapsed</div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 3,
-          title: "Trigger Reminder Action",
-          description: "Reminder queued and executed",
-          triggerEventIndex: 2,
-          renderArtifact: () => (
-            <div className="artifact-reminder">
-              <div style={{ marginBottom: "8px", fontWeight: "600", color: "#e5e7eb" }}>
-                Reminder Notification
-              </div>
-              <div style={{ padding: "12px", background: "rgba(34,197,94,0.1)", borderRadius: "4px", borderLeft: "3px solid #4ade80" }}>
-                <div style={{ fontSize: "14px", color: "#4ade80", marginBottom: "4px" }}>🔔 Reminder</div>
-                <div style={{ fontSize: "13px", color: "#86efac" }}>You have an outstanding request waiting for your response</div>
-              </div>
-            </div>
-          ),
-        },
-      ];
-
+      return "After a message is successfully delivered, the system monitors for a reply. If no response is received within the configured 10-minute window, the behavior rule automatically triggers a reminder action to prompt the user.";
     case "fintech-login":
-      return [
-        {
-          step: 1,
-          title: "Login Event Received",
-          description: "User login detected",
-          triggerEventIndex: 0,
-          renderArtifact: () => (
-            <div className="artifact-card">
-              <div style={{ marginBottom: "8px", color: "#d1d5db" }}>
-                <strong>Authentication Event:</strong>
-              </div>
-              <div style={{ fontSize: "13px", color: "#9ca3af" }}>
-                <div>User: john_doe@fintech.com</div>
-                <div>Status: <span style={{ color: "#60a5fa" }}>Authenticated</span></div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 2,
-          title: "Rule Matching & Actions Queued",
-          description: "2 rules matched, 2 actions queued",
-          triggerEventIndex: 1,
-          renderArtifact: () => (
-            <div className="artifact-card">
-              <div style={{ marginBottom: "8px", color: "#d1d5db" }}>
-                <strong>Matched Rules:</strong>
-              </div>
-              <div style={{ fontSize: "13px", color: "#9ca3af" }}>
-                <div>✓ welcome_popup</div>
-                <div>✓ guidance_tour</div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 3,
-          title: "Sequential Actions Executed",
-          description: "Popups triggered with delays",
-          triggerEventIndex: 2,
-          renderArtifact: () => (
-            <div className="artifact-popup">
-              <div style={{ marginBottom: "12px", fontWeight: "600", color: "#e5e7eb" }}>
-                Popups Rendered
-              </div>
-              <div style={{ marginBottom: "12px", padding: "12px", background: "rgba(96,165,250,0.1)", borderRadius: "4px", borderLeft: "3px solid #60a5fa" }}>
-                <div style={{ color: "#93c5fd", marginBottom: "4px" }}>Welcome back 👋</div>
-                <div style={{ fontSize: "13px", color: "#bfdbfe" }}>Do you need help completing your transaction?</div>
-              </div>
-              <div style={{ padding: "12px", background: "rgba(34,197,94,0.1)", borderRadius: "4px", borderLeft: "3px solid #4ade80" }}>
-                <div style={{ color: "#86efac", marginBottom: "4px" }}>Guided Tour 📍</div>
-                <div style={{ fontSize: "13px", color: "#86efac" }}>Click through key features of your dashboard</div>
-              </div>
-            </div>
-          ),
-        },
-      ];
-
+      return "When a user logs in, the system matches against configured rules. Multiple rules fire triggering sequential actions to create a smooth user experience without overwhelming the interface.";
     case "active-hours":
-      return [
-        {
-          step: 1,
-          title: "Check Active Hours Window",
-          description: "Receiver timezone evaluated",
-          triggerEventIndex: 1,
-          renderArtifact: () => (
-            <div className="artifact-card">
-              <div style={{ marginBottom: "8px", color: "#d1d5db" }}>
-                <strong>Active Hours Rule:</strong>
-              </div>
-              <div style={{ fontSize: "13px", color: "#9ca3af" }}>
-                <div>Receiver: America/Los_Angeles</div>
-                <div>Current Time: 2:15 AM PST</div>
-                <div>Active Hours: 9 AM - 6 PM</div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 2,
-          title: "Outside Delivery Window",
-          description: "Message delivery delayed",
-          triggerEventIndex: 2,
-          renderArtifact: () => (
-            <div className="artifact-delay">
-              <div style={{ marginBottom: "8px", fontWeight: "600", color: "#e5e7eb" }}>
-                Delivery Status
-              </div>
-              <div style={{ padding: "12px", background: "rgba(251,191,36,0.1)", borderRadius: "4px", borderLeft: "3px solid #fbbf24" }}>
-                <div style={{ color: "#fcd34d", marginBottom: "4px", fontWeight: "500" }}>⏸️ Delayed</div>
-                <div style={{ fontSize: "13px", color: "#fde68a" }}>Outside active hours - Message will be delivered during business hours</div>
-              </div>
-            </div>
-          ),
-        },
-        {
-          step: 3,
-          title: "Schedule Safe Delivery",
-          description: "Message queued for 9 AM",
-          triggerEventIndex: 3,
-          renderArtifact: () => (
-            <div className="artifact-scheduled">
-              <div style={{ marginBottom: "8px", fontWeight: "600", color: "#e5e7eb" }}>
-                Scheduled Delivery
-              </div>
-              <div style={{ padding: "12px", background: "rgba(168,85,247,0.1)", borderRadius: "4px", borderLeft: "3px solid #c084fa" }}>
-                <div style={{ color: "#d8b4fe", marginBottom: "4px", fontWeight: "500" }}>📅 Tomorrow at 9:00 AM PST</div>
-                <div style={{ fontSize: "13px", color: "#e9d5ff" }}>User will receive notification during active hours</div>
-              </div>
-            </div>
-          ),
-        },
-      ];
-
+      return `The user is located in the ${metadata.receiverLocal} timezone. To respect their schedule and avoid disrupting their rest, the system automatically delays delivery until the next business day during active hours.`;
     default:
-      return [];
+      return "Reasoning not available";
   }
 }
+
+function getRuleImpact(scenario: ScenarioId, metadata: Metadata): string {
+  switch (scenario) {
+    case "dual-time":
+      return "Message metadata enriched with UTC and local times for both sender and receiver, improving message context and engagement";
+    case "behavior-reminder":
+      return "Automated reminder sent, increasing engagement and reducing missed requests";
+    case "fintech-login":
+      return "Sequential actions displayed, improving onboarding and feature discovery";
+    case "active-hours":
+      return "Message delayed to ensure delivery during active hours, improving user experience and engagement rates";
+    default:
+      return "Impact not available";
+  }
+}
+
+// API Service (handled by demoApi.js)
+// All demo scenarios are managed by the backend service
+
+function getEngineSteps() {
+  // Engine execution flow now managed by backend - no hardcoded steps
+  return [];
+}
+
+// Rule explanations now dynamically generated from backend metadata
 
 const App = () => {
   const [selectedScenario, setSelectedScenario] = useState<ScenarioId | "">("");
@@ -579,7 +183,6 @@ const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [metadata, setMetadata] = useState<Metadata | null>(null);
-  const [engineSteps, setEngineSteps] = useState<EngineStep[]>([]);
   const [currentEventIndex, setCurrentEventIndex] = useState(-1);
   const [demoComplete, setDemoComplete] = useState(false);
 
@@ -591,7 +194,6 @@ const App = () => {
     setMetadata(null);
     setCurrentEventIndex(-1);
     setDemoComplete(false);
-    setEngineSteps(getEngineSteps(scenarioId));
 
     try {
       const result = await runDemoScenario(scenarioId);
@@ -614,40 +216,6 @@ const App = () => {
       console.error("Demo error:", err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case "info":
-        return <CheckCircleIcon />;
-      case "action":
-        return <ZapIcon />;
-      case "rule":
-        return <AlertCircleIcon />;
-      case "warning":
-        return <AlertTriangleIcon />;
-      case "error":
-        return <AlertCircleIcon />;
-      default:
-        return <ClockIcon />;
-    }
-  };
-
-  const getEventColor = (type: string) => {
-    switch (type) {
-      case "info":
-        return "event-info";
-      case "action":
-        return "event-action";
-      case "rule":
-        return "event-rule";
-      case "warning":
-        return "event-warning";
-      case "error":
-        return "event-error";
-      default:
-        return "event-default";
     }
   };
 
@@ -728,6 +296,9 @@ const App = () => {
         className="main-container"
         style={{ maxWidth: "1280px", margin: "0 auto", padding: "32px 24px" }}
       >
+        {/* 📋 Demo Script Guide */}
+        <DemoScriptGuide />
+
         <div className="grid-layout">
           <div className="sidebar">
             <div
@@ -828,6 +399,20 @@ const App = () => {
           </div>
 
           <div className="content">
+            {/* 🔄 Channel Orchestration Panel */}
+            {selectedScenario && !loading && (
+              <ChannelOrchestrationPanel channels={["SMS", "Email", "Push", "Webhook"]} />
+            )}
+
+            {/* ⏸️ Delay Status Banner for active-hours scenario */}
+            {selectedScenario === "active-hours" && metadata && metadata.status === "delayed" && (
+              <DelayStatusBanner
+                status="delayed"
+                scheduledFor={metadata.receiverLocal || "Tomorrow at 9:00 AM PST"}
+                reason="Receiver is in PST timezone, currently outside 9 AM - 6 PM window"
+              />
+            )}
+
             {metadata && (
               <MessageLifecyclePanel
                 lifecycle={{
@@ -922,53 +507,20 @@ const App = () => {
             {currentEventIndex >= 0 && (
               <ExplanationPanel currentEvent={events[currentEventIndex]} />
             )}
+
+            {/* ⚙️ Rule Explanation Panel with backend data */}
+            {currentEventIndex >= 0 && selectedScenario && metadata && (
+              <RuleExplanationPanel
+                rule={metadata.rule}
+                condition={getRuleCondition(selectedScenario, metadata)}
+                reasoning={getRuleReasoning(selectedScenario, metadata)}
+                impact={getRuleImpact(selectedScenario, metadata)}
+              />
+            )}
           </div>
         </div>
 
-        {engineSteps.length > 0 && (
-          <div className="engine-panel">
-            <h2
-              style={{
-                fontSize: "12px",
-                fontWeight: "600",
-                color: "#d1d5db",
-                marginBottom: "16px",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Engine Execution Flow
-            </h2>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-            >
-              {engineSteps.map((step) => {
-                const isActive = currentEventIndex >= step.triggerEventIndex;
-
-                return (
-                  <div
-                    key={step.step}
-                    className={`engine-step ${isActive ? "active" : "inactive"}`}
-                  >
-                    <div className="engine-header">
-                      <span className="engine-step-number">{step.step}</span>
-                      <div>
-                        <div className="engine-title">{step.title}</div>
-                        <div className="engine-desc">{step.description}</div>
-                      </div>
-                    </div>
-
-                    {isActive && step.renderArtifact && (
-                      <div className="engine-artifact">
-                        {step.renderArtifact()}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Engine Execution Flow is managed by the backend - no hardcoded steps */}
 
         {metadata && (
           <div
@@ -1154,9 +706,92 @@ const App = () => {
         {demoComplete && (
           <DemoStatusBanner status="Execution Complete ✓" />
         )}
+
+        {/* 🔑 API & Authentication Panel */}
+        {selectedScenario && !loading && (
+          <APIAuthPanel
+            expanded={true}
+            apiKey={import.meta.env.VITE_REACT_APP_API_KEY || 'sk_live_test_demo_mode'}
+            endpoint={`http://localhost:3000/api/demo/${selectedScenario}`}
+            rateLimit={{ used: 127, total: 5000 }}
+            uptime={99.97}
+          />
+        )}
       </div>
 
       <style>{`
+        /* App Header */
+        .app-header {
+          border-bottom: 1px solid #1f2937;
+          background: rgba(17, 24, 39, 0.5);
+          backdrop-filter: blur(8px);
+        }
+
+        .header-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 16px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        
+        .header-title {
+          font-size: 24px;
+          font-weight: 700;
+          margin: 0;
+          letter-spacing: -0.025em;
+        }
+        
+        .header-subtitle {
+          font-size: 14px;
+          color: #9ca3af;
+          margin-top: 2px;
+          margin-bottom: 0;
+        }
+        
+        .header-controls {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        
+        .demo-badge {
+          padding: 6px 12px;
+          background: rgba(168, 85, 247, 0.1);
+          border: 1px solid rgba(168, 85, 247, 0.2);
+          border-radius: 6px;
+        }
+        
+        .demo-badge-text {
+          font-size: 12px;
+          font-weight: 500;
+          color: #c084fa;
+          white-space: nowrap;
+        }
+        
+        /* Main Container */
+        .main-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 32px 24px;
+        }
+        
+        /* Section Titles */
+        .section-title {
+          font-size: 12px;
+          font-weight: 600;
+          color: #d1d5db;
+          margin-bottom: 16px;
+          margin-top: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        
+        /* Grid Layout */
         .grid-layout {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
@@ -1171,34 +806,237 @@ const App = () => {
           grid-column: span 9;
         }
         
+        /* Sidebar */
+        .sidebar-content {
+          background: rgba(17, 24, 39, 0.5);
+          border: 1px solid #1f2937;
+          border-radius: 8px;
+          padding: 20px;
+          position: sticky;
+          top: 32px;
+        }
+        
+        .scenario-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        
+        .scenario-button {
+          width: 100%;
+          text-align: left;
+          padding: 10px 16px;
+          border-radius: 6px;
+          font-size: 14px;
+          border: 1px solid rgba(55, 65, 81, 0.5);
+          background: rgba(31, 41, 55, 0.5);
+          color: #d1d5db;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .scenario-button.active {
+          border: 1px solid rgba(168, 85, 247, 0.5);
+          background: rgba(168, 85, 247, 0.2);
+          color: #e9d5ff;
+        }
+        
+        .scenario-button.disabled {
+          cursor: not-allowed;
+          opacity: 0.5;
+        }
+        
+        .scenario-button:hover:not(.disabled) {
+          background: rgba(31, 41, 55, 0.8);
+        }
+        
+        .scenario-button.active:hover:not(.disabled) {
+          background: rgba(168, 85, 247, 0.3);
+        }
+        
+        .scenario-indicator {
+          display: inline-block;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #6b7280;
+          margin-right: 8px;
+          vertical-align: middle;
+        }
+        
+        .scenario-indicator.active {
+          background: #c084fa;
+        }
+        
+        .loading-indicator {
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid #1f2937;
+        }
+        
+        .loading-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          color: #9ca3af;
+        }
+        
+        /* Timeline Card */
+        .timeline-card {
+          background: rgba(17, 24, 39, 0.5);
+          border: 1px solid #1f2937;
+          border-radius: 8px;
+          padding: 24px;
+        }
+        
+        /* Empty States */
+        .empty-state {
+          text-align: center;
+          padding: 64px 16px;
+        }
+        
+        .empty-state-icon {
+          display: flex;
+          justify-content: center;
+          margin: 0 auto 12px;
+          opacity: 0.3;
+          color: #6b7280;
+        }
+        
+        .empty-state-icon.error {
+          color: #f87171;
+          opacity: 0.5;
+        }
+        
+        .empty-state-text {
+          font-size: 14px;
+          color: #6b7280;
+          margin: 0;
+        }
+        
+        .empty-state-text.error {
+          color: #f87171;
+        }
+        
+        .empty-state-hint {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 8px;
+          margin-bottom: 0;
+        }
+        
+        /* Metadata Panel */
+        .metadata-panel {
+          margin-top: 24px;
+          background: rgba(17, 24, 39, 0.5);
+          border: 1px solid #1f2937;
+          border-radius: 8px;
+          padding: 24px;
+        }
+        
         .metadata-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 24px;
         }
         
-        @media (max-width: 1024px) {
-          .grid-layout {
-            grid-template-columns: 1fr;
-          }
-          
-          .sidebar {
-            grid-column: span 1;
-          }
-          
-          .content {
-            grid-column: span 1;
-          }
-          
-          .metadata-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .sidebar > div {
-            position: static !important;
-          }
+        .metadata-section-title {
+          font-size: 11px;
+          font-weight: 600;
+          color: #9ca3af;
+          margin-bottom: 12px;
+          margin-top: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
         
+        .metadata-items {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-size: 14px;
+        }
+        
+        .metadata-item {
+          padding-top: 6px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid #1f2937;
+        }
+        
+        .metadata-item.last {
+          border-bottom: none;
+        }
+        
+        .metadata-label {
+          color: #9ca3af;
+          margin-bottom: 4px;
+          font-size: 13px;
+        }
+        
+        .metadata-value {
+          color: #e5e7eb;
+        }
+        
+        .metadata-value.mono {
+          font-family: monospace;
+          font-size: 12px;
+        }
+        
+        .metadata-value.rule {
+          color: #d8b4fe;
+          font-weight: 500;
+          text-transform: capitalize;
+        }
+        
+        .metadata-value.action {
+          color: #86efac;
+          text-transform: capitalize;
+        }
+        
+        .metadata-value.status {
+          font-weight: 500;
+          text-transform: capitalize;
+        }
+
+        /* Artifact Styles */
+        .artifact-card {
+          padding: 12px;
+          background: rgba(31, 41, 55, 0.4);
+          border-radius: 4px;
+          border-left: 3px solid #a78bfa;
+        }
+
+        .artifact-message {
+          border-left: 3px solid #4ade80;
+          padding-left: 12px;
+        }
+
+        .artifact-reminder {
+          border-left: 3px solid #4ade80;
+        }
+
+        .artifact-popup {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .artifact-delay {
+          border-left: 3px solid #fbbf24;
+        }
+
+        .artifact-scheduled {
+          border-left: 3px solid #c084fa;
+        }
+
+        .delivered {
+          color: #4ade80;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        /* Timeline Styles */
         .timeline-container {
           display: flex;
           flex-direction: column;
@@ -1235,6 +1073,7 @@ const App = () => {
           border: 1px solid;
           border-radius: 6px;
           transition: all 0.2s;
+          font-size: 14px;
         }
 
         .event-info {
@@ -1285,6 +1124,7 @@ const App = () => {
           color: #9ca3af;
         }
 
+        /* Status Colors */
         .status-success {
           color: #4ade80;
         }
@@ -1305,6 +1145,7 @@ const App = () => {
           color: #9ca3af;
         }
 
+        /* Spinner */
         .spinner {
           width: 16px;
           height: 16px;
@@ -1330,101 +1171,306 @@ const App = () => {
             transform: translateY(0);
           }
         }
-
-        .engine-panel {
-          margin-top: 24px;
-          background: rgba(17, 24, 39, 0.5);
-          border: 1px solid #1f2937;
-          border-radius: 8px;
-          padding: 24px;
+        
+        /* Tablet Responsive (1024px and below) */
+        @media (max-width: 1024px) {
+          .header-container {
+            padding: 14px 20px;
+          }
+          
+          .header-title {
+            font-size: 22px;
+          }
+          
+          .header-subtitle {
+            font-size: 13px;
+          }
+          
+          .main-container {
+            padding: 24px 20px;
+          }
+          
+          .grid-layout {
+            grid-template-columns: 1fr;
+            gap: 20px;
+          }
+          
+          .sidebar {
+            grid-column: span 1;
+          }
+          
+          .content {
+            grid-column: span 1;
+          }
+          
+          .sidebar-content {
+            position: static !important;
+            top: auto;
+          }
+          
+          .metadata-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+          }
+          
+          .timeline-card,
+          .metadata-panel,
+          .engine-panel {
+            padding: 20px;
+          }
         }
-
-        .engine-step {
-          padding: 12px;
-          border: 1px solid #1f2937;
-          border-radius: 6px;
-          margin-bottom: 12px;
-          opacity: 0.4;
-          transition: all 0.3s ease;
-          background: rgba(31, 41, 55, 0.2);
+        
+        /* Mobile Responsive (768px and below) */
+        @media (max-width: 768px) {
+          .header-container {
+            padding: 12px 16px;
+            gap: 10px;
+          }
+          
+          .header-title {
+            font-size: 20px;
+          }
+          
+          .header-subtitle {
+            font-size: 12px;
+            margin-top: 4px;
+          }
+          
+          .header-controls {
+            width: 100%;
+            justify-content: space-between;
+          }
+          
+          .demo-badge {
+            padding: 4px 10px;
+          }
+          
+          .demo-badge-text {
+            font-size: 11px;
+          }
+          
+          .main-container {
+            padding: 20px 16px;
+          }
+          
+          .grid-layout {
+            gap: 16px;
+          }
+          
+          .sidebar-content {
+            padding: 16px;
+          }
+          
+          .section-title {
+            font-size: 11px;
+            margin-bottom: 14px;
+          }
+          
+          .scenario-button {
+            padding: 9px 14px;
+            font-size: 13px;
+          }
+          
+          .timeline-card,
+          .metadata-panel,
+          .engine-panel {
+            padding: 16px;
+          }
+          
+          .metadata-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+          
+          .metadata-section-title {
+            font-size: 10px;
+            margin-bottom: 10px;
+          }
+          
+          .metadata-label {
+            font-size: 12px;
+          }
+          
+          .metadata-value {
+            font-size: 13px;
+          }
+          
+          .metadata-value.mono {
+            font-size: 11px;
+          }
+          
+          .timeline-container {
+            max-height: 320px;
+            gap: 10px;
+          }
+          
+          .timeline-event {
+            padding: 10px;
+            gap: 10px;
+            font-size: 13px;
+          }
+          
+          .engine-title {
+            font-size: 13px;
+          }
+          
+          .engine-desc {
+            font-size: 12px;
+          }
+          
+          .empty-state {
+            padding: 48px 16px;
+          }
+          
+          .empty-state-text {
+            font-size: 13px;
+          }
         }
-
-        .engine-step.active {
-          opacity: 1;
-          border-color: rgba(168, 85, 247, 0.5);
-          background: rgba(31, 41, 55, 0.6);
+        
+        /* Small Mobile (480px and below) */
+        @media (max-width: 480px) {
+          .header-container {
+            padding: 10px 12px;
+          }
+          
+          .header-title {
+            font-size: 18px;
+          }
+          
+          .header-subtitle {
+            font-size: 11px;
+          }
+          
+          .demo-badge-text {
+            font-size: 10px;
+          }
+          
+          .main-container {
+            padding: 16px 12px;
+          }
+          
+          .grid-layout {
+            gap: 12px;
+          }
+          
+          .sidebar-content {
+            padding: 14px;
+          }
+          
+          .scenario-button {
+            padding: 8px 12px;
+            font-size: 12px;
+          }
+          
+          .scenario-indicator {
+            width: 6px;
+            height: 6px;
+            margin-right: 6px;
+          }
+          
+          .timeline-card,
+          .metadata-panel,
+          .engine-panel {
+            padding: 14px;
+          }
+          
+          .section-title {
+            font-size: 10px;
+            margin-bottom: 12px;
+          }
+          
+          .metadata-section-title {
+            font-size: 9px;
+          }
+          
+          .metadata-label {
+            font-size: 11px;
+          }
+          
+          .metadata-value {
+            font-size: 12px;
+          }
+          
+          .metadata-value.mono {
+            font-size: 10px;
+            word-break: break-all;
+          }
+          
+          .timeline-container {
+            max-height: 280px;
+            gap: 8px;
+          }
+          
+          .timeline-event {
+            padding: 8px;
+            gap: 8px;
+            font-size: 12px;
+          }
+          
+          .engine-step {
+            padding: 10px;
+          }
+          
+          .engine-title {
+            font-size: 12px;
+          }
+          
+          .engine-desc {
+            font-size: 11px;
+          }
+          
+          .engine-artifact {
+            padding: 10px;
+            margin-top: 10px;
+          }
+          
+          .empty-state {
+            padding: 32px 12px;
+          }
+          
+          .empty-state-text {
+            font-size: 12px;
+          }
+          
+          .empty-state-hint {
+            font-size: 11px;
+          }
+          
+          .loading-content {
+            font-size: 13px;
+          }
         }
-
-        .engine-header {
-          display: flex;
-          gap: 12px;
-          align-items: flex-start;
-        }
-
-        .engine-step-number {
-          font-family: monospace;
-          font-weight: 600;
-          color: #c084fa;
-          min-width: 24px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .engine-title {
-          font-size: 14px;
-          font-weight: 500;
-          color: #e5e7eb;
-        }
-
-        .engine-desc {
-          font-size: 13px;
-          color: #9ca3af;
-          margin-top: 4px;
-        }
-
-        .engine-artifact {
-          margin-top: 12px;
-          padding: 12px;
-          background: rgba(0, 0, 0, 0.3);
-          border-radius: 6px;
-          animation: slideIn 0.3s ease-out;
-        }
-
-        .artifact-card {
-          padding: 12px;
-          background: rgba(31, 41, 55, 0.4);
-          border-radius: 4px;
-          border-left: 3px solid #a78bfa;
-        }
-
-        .artifact-message {
-          border-left: 3px solid #4ade80;
-          padding-left: 12px;
-        }
-
-        .artifact-reminder {
-          border-left: 3px solid #4ade80;
-        }
-
-        .artifact-popup {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .artifact-delay {
-          border-left: 3px solid #fbbf24;
-        }
-
-        .artifact-scheduled {
-          border-left: 3px solid #c084fa;
-        }
-
-        .delivered {
-          color: #4ade80;
-          font-size: 12px;
-          font-weight: 500;
+        
+        /* Extra Small Mobile (360px and below) */
+        @media (max-width: 360px) {
+          .header-title {
+            font-size: 16px;
+          }
+          
+          .header-subtitle {
+            font-size: 10px;
+          }
+          
+          .header-controls {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+          
+          .main-container {
+            padding: 12px 8px;
+          }
+          
+          .scenario-button {
+            font-size: 11px;
+            padding: 7px 10px;
+          }
+          
+          .timeline-card,
+          .metadata-panel,
+          .engine-panel {
+            padding: 12px;
+          }
         }
       `}</style>
     </div>

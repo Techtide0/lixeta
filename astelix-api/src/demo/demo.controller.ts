@@ -6,22 +6,22 @@ export class DemoController {
   constructor(private readonly demoService: DemoService) {}
 
   @Post('dual-time')
-  dualTime() {
+  dualTime(): any {
     return this.demoService.dualTimeScenario();
   }
 
   @Post('behavior-reminder')
-  behaviorReminder() {
+  behaviorReminder(): any {
     return this.demoService.behaviorReminderScenario();
   }
 
   @Post('fintech-login')
-  fintechLogin() {
+  fintechLogin(): any {
     return this.demoService.fintechLoginScenario();
   }
 
   @Post('active-hours')
-  activeHours() {
+  activeHours(): any {
     return this.demoService.activeHoursScenario();
   }
 }

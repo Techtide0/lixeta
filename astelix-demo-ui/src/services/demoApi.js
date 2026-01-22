@@ -1,14 +1,18 @@
 /**
  * Demo API Service
- * Handles all communication with the backend demo endpoints
+ * This service acts as the interface between the UI and the backend
+ * Currently calls real API endpoints on the NestJS backend
  */
 
+/**
+ * Run a demo scenario by calling the real backend
+ */
 export async function runDemoScenario(scenario) {
   const endpoints = {
-    'dual-time': '/demo/dual-time',
-    'behavior-reminder': '/demo/behavior-reminder',
-    'fintech-login': '/demo/fintech-login',
-    'active-hours': '/demo/active-hours'
+    'dual-time': '/api/demo/dual-time',
+    'behavior-reminder': '/api/demo/behavior-reminder',
+    'fintech-login': '/api/demo/fintech-login',
+    'active-hours': '/api/demo/active-hours'
   };
 
   const endpoint = endpoints[scenario];
@@ -16,16 +20,24 @@ export async function runDemoScenario(scenario) {
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
+  try {
+    const res = await fetch(`http://localhost:3000${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-  if (!res.ok) {
-    throw new Error(`Demo failed: ${res.statusText}`);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
+    const response = await res.json();
+    return response;
+  } catch (error) {
+    console.error(`Error calling ${endpoint}:`, error);
+    throw error;
   }
-
-  return res.json();
 }
 
 export function transformToTimeline(scenario, data) {

@@ -21,6 +21,19 @@ body {
     margin-bottom: 16px;
 }
 
+@media (max-width: 768px) {
+    .panel {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .panel {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+}
+
 .panel-title {
     font-size: 12px;
     font-weight: 600;
@@ -35,6 +48,20 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
+}
+
+@media (max-width: 768px) {
+    .panel-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .panel-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
 }
 
 .panel-grid > div {
@@ -77,6 +104,13 @@ body {
     text-transform: uppercase;
 }
 
+@media (max-width: 480px) {
+    .channel-badge {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+}
+
 .badge-sms {
     background: rgba(59, 130, 246, 0.2);
     color: #60a5fa;
@@ -112,6 +146,21 @@ body {
     margin-bottom: 16px;
 }
 
+@media (max-width: 768px) {
+    .timeline-container {
+        max-height: 350px;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .timeline-container {
+        max-height: 250px;
+        gap: 6px;
+        padding-right: 4px;
+    }
+}
+
 .timeline-container::-webkit-scrollbar {
     width: 6px;
 }
@@ -142,6 +191,20 @@ body {
     animation: slideIn 0.3s ease-out;
 }
 
+@media (max-width: 768px) {
+    .timeline-event {
+        padding: 10px;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .timeline-event {
+        padding: 8px;
+        gap: 6px;
+    }
+}
+
 .timeline-time {
     font-size: 12px;
     font-family: monospace;
@@ -149,9 +212,27 @@ body {
     white-space: nowrap;
 }
 
+@media (max-width: 480px) {
+    .timeline-time {
+        font-size: 10px;
+    }
+}
+
 .timeline-message {
     font-size: 14px;
     color: #e5e7eb;
+}
+
+@media (max-width: 768px) {
+    .timeline-message {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .timeline-message {
+        font-size: 12px;
+    }
 }
 
 .event-info {
@@ -219,6 +300,20 @@ body {
 .presenter-controls {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .presenter-controls {
+        flex-direction: column;
+        gap: 6px;
+    }
+}
+
+@media (max-width: 480px) {
+    .presenter-controls {
+        gap: 4px;
+    }
 }
 
 .presenter-controls button {
@@ -232,6 +327,25 @@ body {
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+    flex: 1;
+    min-width: 150px;
+}
+
+@media (max-width: 768px) {
+    .presenter-controls button {
+        padding: 6px 12px;
+        font-size: 13px;
+        min-width: 120px;
+    }
+}
+
+@media (max-width: 480px) {
+    .presenter-controls button {
+        padding: 8px 12px;
+        font-size: 12px;
+        min-width: 100%;
+        flex: 1 1 100%;
+    }
 }
 
 .presenter-controls button:hover {
