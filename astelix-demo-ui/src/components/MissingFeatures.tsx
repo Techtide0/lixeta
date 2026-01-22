@@ -1,5 +1,6 @@
 /// <reference types="../vite-env.d.ts" />
 import React, { useState } from 'react';
+import { API_CONFIG } from '../config/apiConfig';
 
 // 1️⃣ Enhanced Delay Status Banner Component
 interface DelayStatusBannerProps {
@@ -343,7 +344,7 @@ interface APIAuthPanelProps {
 export const APIAuthPanel = ({
   expanded = true,
   apiKey = import.meta.env.VITE_REACT_APP_API_KEY || 'sk_live_demo_mode_test_key',
-  endpoint = 'http://localhost:3000/api/demo',
+  endpoint = `${API_CONFIG.baseUrl}/api/demo`,
   rateLimit = { used: 4, total: 5000 },
   uptime = 99.98,
 }: APIAuthPanelProps) => {

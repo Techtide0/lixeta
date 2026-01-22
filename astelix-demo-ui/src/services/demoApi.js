@@ -4,24 +4,20 @@
  * Currently calls real API endpoints on the NestJS backend
  */
 
+import { buildApiUrl, getEndpointPath, API_CONFIG } from '../config/apiConfig';
+
 /**
  * Run a demo scenario by calling the real backend
  */
 export async function runDemoScenario(scenario) {
-  const endpoints = {
-    'dual-time': '/api/demo/dual-time',
-    'behavior-reminder': '/api/demo/behavior-reminder',
-    'fintech-login': '/api/demo/fintech-login',
-    'active-hours': '/api/demo/active-hours'
-  };
-
-  const endpoint = endpoints[scenario];
+  const endpoint = getEndpointPath(scenario);
   if (!endpoint) {
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
   try {
-    const res = await fetch(`http://localhost:3000${endpoint}`, {
+    const fullUrl = buildApiUrl(endpoint);
+    const res = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

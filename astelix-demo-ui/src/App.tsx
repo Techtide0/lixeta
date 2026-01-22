@@ -6,6 +6,7 @@ import ExplanationPanel from "./components/ExplanationPanel";
 import DemoStatusBanner from "./components/DemoStatusBanner";
 import PresenterControls from "./components/PresenterControls";
 import { runDemoScenario } from "./services/demoApi";
+import { API_CONFIG } from "./config/apiConfig";
 import {
   DelayStatusBanner,
   RuleExplanationPanel,
@@ -712,7 +713,7 @@ const App = () => {
           <APIAuthPanel
             expanded={true}
             apiKey={import.meta.env.VITE_REACT_APP_API_KEY || 'sk_live_test_demo_mode'}
-            endpoint={`http://localhost:3000/api/demo/${selectedScenario}`}
+            endpoint={`${API_CONFIG.baseUrl}/api/demo/${selectedScenario}`}
             rateLimit={{ used: 127, total: 5000 }}
             uptime={99.97}
           />
