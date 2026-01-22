@@ -8,7 +8,8 @@ async function bootstrap(): Promise<void> {
   const allowedOrigins = [
     'http://localhost:5173', // Local development
     'http://localhost:3000', // Local API
-    'https://lixeta.onrender.com', // Production frontend
+    'https://www.lixeta.com', // Production frontend
+    'https://lixeta.onrender.com', // Alternative production domain
   ];
 
   if (process.env.CORS_ORIGIN) {
