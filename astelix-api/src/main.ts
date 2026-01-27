@@ -10,6 +10,7 @@ async function bootstrap(): Promise<void> {
     'http://localhost:3000', // Local API
     'https://www.lixeta.com', // Production frontend
     'https://lixeta.onrender.com', // Alternative production domain
+    'https://lixeta.vercel.app', // Vercel deployed frontend
   ];
 
   if (process.env.CORS_ORIGIN) {
