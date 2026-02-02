@@ -3,7 +3,23 @@
 import { TimelineData, AnalyticsData } from '../types/timeline';
 import { ScenarioId } from '../components/ScenarioSelector.tsx';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ? String(import.meta.env.VITE_API_URL) : 'http://localhost:3000/api';
+// Determine API base URL based on environment
+const getAPIBaseURL = (): string => {
+  // Check if VITE_API_URL environment variable is set
+  if (import.meta.env.VITE_API_URL) {
+    return String(import.meta.env.VITE_API_URL);
+  }
+
+  // Development environment
+  if (import.meta.env.DEV) {
+    return 'http://localhost:3000/api';
+  }
+
+  // Production environment
+  return 'https://lixeta.onrender.com/api';
+};
+
+const API_BASE_URL = getAPIBaseURL();
 
 export class LixetaAPI {
   static async fetchLatestTimeline(): Promise<TimelineData> {

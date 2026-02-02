@@ -6,10 +6,15 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   const allowedOrigins = [
-    'http://localhost:5173', // Local development
+    'http://localhost:5173', // Local development (Vite default)
+    'http://localhost:5174', // Local development (Vite fallback)
+    'http://localhost:3001', // Local development (alternative)
     'http://localhost:3000', // Local API
+    'http://127.0.0.1:5173', // Local development (IPv4)
+    'http://127.0.0.1:3001', // Local development (IPv4)
+    'https://lixeta.onrender.com', // Production backend
+    'https://lixeta-ui.onrender.com', // Production frontend
     'https://www.lixeta.com', // Production frontend
-    'https://lixeta.onrender.com', // Alternative production domain
     'https://lixeta.vercel.app', // Vercel deployed frontend
   ];
 
