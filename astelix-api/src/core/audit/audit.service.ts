@@ -47,6 +47,59 @@ export class AuditService {
   }
 
   /**
+   * Log a message read event
+   */
+  logMessageRead(data: {
+    senderId: string;
+    receiverId: string;
+    messageId: string;
+    timezone?: string;
+  }): AuditLog {
+    const log: AuditLog = {
+      id: `audit_${randomUUID()}`,
+      type: 'message_read',
+      referenceId: data.messageId,
+      timestampUtc: new Date(),
+      timezone: data.timezone,
+      userId: data.receiverId,
+      metadata: {
+        senderId: data.senderId,
+        receiverId: data.receiverId,
+      },
+    };
+
+    this.logs.push(log);
+    return log;
+  }
+
+  /**
+   * Log a message replied event
+   */
+  logMessageReplied(data: {
+    senderId: string;
+    receiverId: string;
+    messageId: string;
+    timezone?: string;
+  }): AuditLog {
+    const log: AuditLog = {
+      id: `audit_${randomUUID()}`,
+      type: 'message_replied',
+      referenceId: data.messageId,
+      timestampUtc: new Date(),
+      timezone: data.timezone,
+      userId: data.receiverId,
+      metadata: {
+        senderId: data.senderId,
+        receiverId: data.receiverId,
+      },
+    };
+
+    this.logs.push(log);
+    return log;
+  }
+
+
+  /**
    * Log a rule execution
    */
   logRuleExecution(data: {

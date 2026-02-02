@@ -9,6 +9,7 @@ import { ApiKeyGuard } from './auth/api-key.guard';
 import { SendMessageDto } from './messages/dto/send-message.dto';
 import { ScheduleMessageDto } from './messages/dto/schedule-message.dto';
 import { SandboxEventDto } from './dto/sandbox-event.dto';
+import { SignalsService } from '../core/signals/signals.service';
 
 @Controller('sandbox')
 @UseGuards(ApiKeyGuard)
@@ -20,6 +21,7 @@ export class SandboxController {
     private readonly messageStateService: MessageStateService,
     private readonly ruleEvaluator: RuleEvaluator,
     private readonly activeHoursService: ActiveHoursService,
+    private readonly signalsService: SignalsService,
   ) {}
 
   // User endpoints
@@ -56,21 +58,21 @@ export class SandboxController {
   }
 
   @Post('message/:messageId/mark-delivered')
-  markDelivered(@Param('messageId') messageId: string) {
+  async markDelivered(@Param('messageId') messageId: string): Promise<unknown> {
     const nowUtc = new Date().toISOString();
-    return this.messageStateService.markDelivered(messageId, nowUtc);
+    return await this.messageStateService.markDelivered(messageId, nowUtc);
   }
 
   @Post('message/:messageId/mark-read')
-  markRead(@Param('messageId') messageId: string) {
+  async markRead(@Param('messageId') messageId: string): Promise<unknown> {
     const nowUtc = new Date().toISOString();
-    return this.messageStateService.markRead(messageId, nowUtc);
+    return await this.messageStateService.markRead(messageId, nowUtc);
   }
 
   @Post('message/:messageId/mark-replied')
-  markReplied(@Param('messageId') messageId: string) {
+  async markReplied(@Param('messageId') messageId: string): Promise<unknown> {
     const nowUtc = new Date().toISOString();
-    return this.messageStateService.markReplied(messageId, nowUtc);
+    return await this.messageStateService.markReplied(messageId, nowUtc);
   }
 
   // Rule evaluation endpoints (S3)
@@ -89,23 +91,58 @@ export class SandboxController {
 
   // Active hours endpoints (S4)
   @Get('active-hours/:userId')
-  getActiveHours(@Param('userId') userId: string) {
-    return this.activeHoursService.getActiveHours(userId);
+  async getActiveHours(@Param('userId') userId: string) {
+    const activeHours = await this.activeHoursService.getActiveHours(userId);
+    const user = await this.userService.findByExternalId(userId);
+
+    if (!activeHours || !user) {
+      return {
+        error: 'User not found',
+        statusCode: 404,
+      };
+    }
+
+    const nowUtc = new Date();
+    const nowLocalStr = nowUtc.toLocaleString('en-US', {
+      timeZone: user.timezone,
+    });
+
+    return {
+      sandbox: true,
+      userId,
+      timezone: user.timezone,
+      activeWindow: `${String(activeHours.startHour).padStart(2, '0')}:00 - ${String(activeHours.endHour).padStart(2, '0')}:00`,
+      nowLocalTime: new Date(nowLocalStr).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }),
+    };
   }
 
   @Get('can-deliver/:userId')
   async canDeliverNow(@Param('userId') userId: string) {
     const activeHours = await this.activeHoursService.getActiveHours(userId);
+    const user = await this.userService.findByExternalId(userId);
+
+    if (!user) {
+      return { error: 'User not found', statusCode: 404 };
+    }
+
     if (!activeHours) {
-      return { userId, canDeliver: true, reason: 'No active hours set' };
+      return {
+        sandbox: true,
+        userId,
+        canDeliver: true,
+        reason: 'No active hours configured',
+      };
     }
 
     const nowUtc = new Date();
-    const localStr = nowUtc.toLocaleString('en-US', {
-      timeZone:
-        (await this.userService.findByExternalId(userId))?.timezone || 'UTC',
+    const nowLocalStr = nowUtc.toLocaleString('en-US', {
+      timeZone: user.timezone,
     });
-    const localDate = new Date(localStr);
+    const localDate = new Date(nowLocalStr);
     const localHour = localDate.getHours();
 
     const canDeliver = this.activeHoursService.canDeliverNow(
@@ -113,10 +150,10 @@ export class SandboxController {
       activeHours,
     );
     return {
+      sandbox: true,
       userId,
       canDeliver,
-      localHour,
-      activeHours: `${activeHours.startHour}:00 - ${activeHours.endHour}:00`,
+      reason: canDeliver ? null : 'Outside active hours',
     };
   }
 
@@ -137,7 +174,7 @@ export class SandboxController {
     }
 
     const nowUtc = new Date();
-    const delayResult = await this.activeHoursService.getNextAllowedDeliveryUtc(
+    const delayResult = this.activeHoursService.getNextAllowedDeliveryUtc(
       nowUtc,
       user.timezone,
       activeHours,
@@ -152,9 +189,76 @@ export class SandboxController {
   }
 
   // Signal endpoints
+  @Get('signals/catalog')
+  getSignalCatalog() {
+    return {
+      signals: [
+        {
+          type: 'user_login',
+          description: 'User authentication/login event',
+          eventTypes: ['USER_LOGIN'],
+          demoActions: [
+            {
+              type: 'send_message',
+              reason: 'User login detected',
+              channel: 'sandbox',
+            },
+            {
+              type: 'notify',
+              reason: "Signal 'login' recorded",
+            },
+          ],
+        },
+        {
+          type: 'user_click',
+          description: 'User interaction/click event',
+          eventTypes: ['USER_CLICK'],
+          demoActions: [
+            {
+              type: 'send_message',
+              reason: 'User clicked a key element',
+              channel: 'sandbox',
+            },
+          ],
+        },
+        {
+          type: 'scroll',
+          description: 'Page scroll activity',
+          eventTypes: [],
+          demoActions: [],
+        },
+        {
+          type: 'message_sent',
+          description: 'Outgoing message created',
+          eventTypes: ['MESSAGE_SENT'],
+          demoActions: [],
+        },
+        {
+          type: 'message_read',
+          description: 'Message marked as read',
+          eventTypes: [],
+          demoActions: [],
+        },
+        {
+          type: 'message_replied',
+          description: 'Message reply sent',
+          eventTypes: [],
+          demoActions: [],
+        },
+      ],
+    };
+  }
+
   @Post('signals')
-  recordSignal() {
-    return this.sandboxService.recordSignal();
+  recordSignal(
+    @Body()
+    data: {
+      userId: string;
+      type: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    return this.sandboxService.recordSignal(data);
   }
 
   // Message delivery endpoints
@@ -174,7 +278,7 @@ export class SandboxController {
 
   // Behavior rules endpoints
   @Post('events/process')
-  processEvent(@Body() eventData: any) {
+  processEvent(@Body() eventData: Record<string, unknown>) {
     return this.sandboxService.processEvent(eventData);
   }
 
@@ -293,14 +397,4 @@ export class SandboxController {
    * GET /sandbox/users
    * Returns: [{ id, timezone }, ...]
    */
-  @Get('users')
-  async getSandboxUsers() {
-    // Return seeded sandbox users with timezones
-    const users = await this.userService.findAll();
-    return users.map((u) => ({
-      id: u.externalUserId,
-      timezone: u.timezone,
-      internalId: u.id,
-    }));
-  }
 }

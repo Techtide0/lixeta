@@ -10,12 +10,14 @@ export class AuthController {
     const apiKey = await this.apiKeyService.createKey();
     return {
       success: true,
-      message: 'API key generated successfully',
-      key: apiKey.key,
-      id: apiKey.id,
-      active: apiKey.active,
-      createdAt: apiKey.createdAt,
-      note: 'Use x-api-key header with this key in all sandbox requests',
+      message: 'Sandbox API key generated successfully',
+      apiKey: apiKey.key,
+      environment: 'sandbox',
+      auth: {
+        header: 'x-api-key',
+        usage: 'Include the API key in the request header as x-api-key',
+      },
+      note: 'This key is for sandbox testing only. No real messages are sent.',
     };
   }
 }

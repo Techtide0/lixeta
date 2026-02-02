@@ -5,6 +5,8 @@ export type AuditLogType =
   | 'decision_executed'
   | 'decision_delayed'
   | 'message_delivery'
+  | 'message_read'
+  | 'message_replied'
   | 'event_processed'
   | 'behavior_rule_executed';
 

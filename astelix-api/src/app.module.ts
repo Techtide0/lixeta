@@ -10,6 +10,7 @@ import { DecisionsModule } from './core/decisions/decisions.module';
 import { OrchestratorModule } from './core/orchestrator/orchestrator.module';
 import { SandboxModule } from './sandbox/sandbox.module';
 import { DemoModule } from './demo/demo.module';
+import { LixetaModule } from './lixeta/lixeta.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { DemoModule } from './demo/demo.module';
     OrchestratorModule,
     SandboxModule,
     DemoModule,
+    LixetaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -40,6 +40,9 @@ export class SandboxMessageEntity {
   @Column({ nullable: true })
   scheduledForUtc?: string;
 
+  @Column({ nullable: true })
+  decisionReason?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }

@@ -7,6 +7,7 @@ import { MessageStateService } from './message-state.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ScheduleMessageDto } from './dto/schedule-message.dto';
 import { ActiveHoursService } from '../users/active-hours.service';
+import { AuditService } from '../../core/audit/audit.service';
 
 @Injectable()
 export class MessageService {
@@ -16,6 +17,7 @@ export class MessageService {
     private readonly userService: SandboxUserService,
     private readonly stateService: MessageStateService,
     private readonly activeHoursService: ActiveHoursService,
+    private readonly auditService: AuditService,
   ) {}
 
   async sendNow(dto: SendMessageDto) {
@@ -48,6 +50,7 @@ export class MessageService {
 
     let status: 'pending' | 'delivered' | 'delayed' = 'delivered';
     let scheduledForUtc: string | undefined;
+    let decisionReason: string | undefined;
 
     if (!canDeliver && activeHours) {
       // Calculate next allowed delivery time
@@ -59,6 +62,7 @@ export class MessageService {
       );
       scheduledForUtc = delayResult.utc.toISOString();
       status = 'delayed';
+      decisionReason = 'Outside receiver active hours';
     }
 
     const message = this.repo.create({
@@ -67,16 +71,28 @@ export class MessageService {
       content: dto.content,
       senderTimezone: sender.timezone,
       receiverTimezone: receiver.timezone,
-      senderLocalTime: senderLocal,
-      receiverLocalTime: receiverLocal,
+      senderLocalTime: this.formatWithTimezoneOffset(nowUtc, sender.timezone),
+      receiverLocalTime: this.formatWithTimezoneOffset(nowUtc, receiver.timezone),
       utcTime: nowUtc.toISOString(),
       status,
       scheduledForUtc,
+      decisionReason,
     });
 
     const savedMessage = await this.repo.save(message);
     await this.stateService.createFromMessage(savedMessage);
-    return savedMessage;
+    
+    // ✅ Write audit event
+    this.auditService.logMessageDelivery({
+      senderId: dto.senderId,
+      receiverId: dto.receiverId,
+      messageId: `msg_${savedMessage.id}`,
+      status: savedMessage.status,
+      timezone: receiver.timezone,
+    });
+    console.log('[AUDIT] message_created:', savedMessage.id, 'status:', savedMessage.status);
+    
+    return this.formatMessageResponse(savedMessage);
   }
 
   async schedule(dto: ScheduleMessageDto) {
@@ -109,6 +125,7 @@ export class MessageService {
     );
     let finalScheduledUtc = utcDate;
     let status: 'pending' | 'delayed' = 'pending';
+    let decisionReason: string | undefined;
 
     if (activeHours) {
       const receiverLocalHour = parseInt(
@@ -130,6 +147,7 @@ export class MessageService {
         );
         finalScheduledUtc = delayResult.utc;
         status = 'delayed';
+        decisionReason = 'Outside receiver active hours';
       }
     }
 
@@ -139,16 +157,28 @@ export class MessageService {
       content: dto.content,
       senderTimezone: sender.timezone,
       receiverTimezone: receiver.timezone,
-      senderLocalTime: senderLocalFormatted,
-      receiverLocalTime: receiverLocalFormatted,
+      senderLocalTime: this.formatWithTimezoneOffset(utcDate, sender.timezone),
+      receiverLocalTime: this.formatWithTimezoneOffset(utcDate, receiver.timezone),
       utcTime: utcDate.toISOString(),
       scheduledForUtc: finalScheduledUtc.toISOString(),
       status,
+      decisionReason,
     });
 
     const savedMessage = await this.repo.save(message);
     await this.stateService.createFromMessage(savedMessage);
-    return savedMessage;
+    
+    // ✅ Write audit event
+    this.auditService.logMessageDelivery({
+      senderId: dto.senderId,
+      receiverId: dto.receiverId,
+      messageId: `msg_${savedMessage.id}`,
+      status: savedMessage.status,
+      timezone: receiver.timezone,
+    });
+    console.log('[AUDIT] message_scheduled:', savedMessage.id, 'status:', savedMessage.status);
+    
+    return this.formatMessageResponse(savedMessage);
   }
 
   async getMessagesByReceiver(receiverId: string) {
@@ -177,4 +207,57 @@ export class MessageService {
     );
     return date.getTime() - local.getTime();
   }
-}
+
+  private formatWithTimezoneOffset(date: Date, timezone: string): string {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const dateObj = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') {
+        dateObj[part.type] = part.value;
+      }
+    }
+
+    const offset = this.getTimezoneOffsetString(timezone, date);
+    return `${dateObj['year']}-${dateObj['month']}-${dateObj['day']}T${dateObj['hour']}:${dateObj['minute']}:${dateObj['second']}${offset}`;
+  }
+
+  private getTimezoneOffsetString(timezone: string, date: Date): string {
+    const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+    const offsetMs = tzDate.getTime() - utcDate.getTime();
+    const offsetMinutes = Math.abs(offsetMs / 60000);
+    const hours = Math.floor(offsetMinutes / 60);
+    const minutes = offsetMinutes % 60;
+    const sign = offsetMs >= 0 ? '+' : '-';
+    return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+
+  private formatMessageResponse(message: SandboxMessageEntity) {
+    return {
+      messageId: `msg_${message.id}`,
+      sandbox: true,
+      senderId: message.senderId,
+      receiverId: message.receiverId,
+      content: message.content,
+      senderTimezone: message.senderTimezone,
+      receiverTimezone: message.receiverTimezone,
+      senderLocalTime: message.senderLocalTime,
+      receiverLocalTime: message.receiverLocalTime,
+      utcTime: message.utcTime,
+      status: message.status,
+      decisionReason: message.decisionReason,
+      scheduledForUtc: message.scheduledForUtc,
+      createdAt: message.createdAt,
+    };
+  }}

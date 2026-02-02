@@ -13,7 +13,7 @@ export class ApiKeyService {
 
   async createKey(): Promise<ApiKeyEntity> {
     const key = this.repo.create({
-      key: randomUUID(),
+      key: `sbx_${randomUUID()}`,
     });
     return this.repo.save(key);
   }
