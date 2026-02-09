@@ -1,6 +1,8 @@
+/// <reference types="vite/client" />
+
 // services/api.ts
 
-import { TimelineData, AnalyticsData } from '../types/timeline';
+import { TimelineData, AnalyticsData, EnhancedAnalyticsData } from '../types/timeline';
 import { ScenarioId } from '../components/ScenarioSelector.tsx';
 
 // Determine API base URL based on environment
@@ -21,6 +23,14 @@ const getAPIBaseURL = (): string => {
 
 const API_BASE_URL = getAPIBaseURL();
 
+// Map scenario IDs to event types for enhanced endpoints
+const scenarioToEventTypeMap: Record<string, string> = {
+  'dual-time': 'payment.failed',
+  'behavior-reminder': 'user.no_response',
+  'fintech-login': 'login.new_device',
+  'active-hours': 'active_hours_event',
+};
+
 export class LixetaAPI {
   static async fetchLatestTimeline(): Promise<TimelineData> {
     try {
@@ -39,8 +49,39 @@ export class LixetaAPI {
     }
   }
 
-  static async fetchTimelineForScenario(scenarioId: ScenarioId): Promise<TimelineData> {
+  static async fetchEnhancedTimeline(
+    eventType: string,
+  ): Promise<EnhancedAnalyticsData> {
     try {
+      const response = await fetch(`${API_BASE_URL}/timeline/enhanced/${eventType}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`Failed to fetch enhanced timeline for ${eventType}:`, error);
+      // Return mock data for demo purposes
+      return this.getMockAnalyticsData() as EnhancedAnalyticsData;
+    }
+  }
+
+  static async fetchTimelineForScenario(
+    scenarioId: ScenarioId,
+  ): Promise<TimelineData> {
+    try {
+      // Try to fetch enhanced timeline first if scenario maps to event type
+      const eventType = scenarioToEventTypeMap[scenarioId];
+      if (eventType) {
+        const enhancedData = await this.fetchEnhancedTimeline(eventType);
+        // Enhanced data has the EnhancedTimelineData structure which is compatible with TimelineData
+        if (enhancedData && 'steps' in enhancedData && 'trigger' in enhancedData) {
+          return enhancedData as unknown as TimelineData;
+        }
+      }
+
       const response = await fetch(`${API_BASE_URL}/timeline/scenario/${scenarioId}`);
       
       if (!response.ok) {
@@ -58,15 +99,18 @@ export class LixetaAPI {
 
   static async fetchAnalytics(range: string = '30d'): Promise<AnalyticsData> {
     try {
-      // Map frontend range format to backend format
-      const dateRangeMap: Record<string, string> = {
-        '7d': 'last7Days',
-        '30d': 'last30Days',
-        '90d': 'last90Days'
+      // Try enhanced analytics endpoint first
+      const rangeMap: Record<string, '7d' | '30d' | '90d'> = {
+        '7d': '7d',
+        '30d': '30d',
+        '90d': '90d',
+        'last7Days': '7d',
+        'last30Days': '30d',
+        'last90Days': '90d'
       };
       
-      const dateRange = dateRangeMap[range] || 'last30Days';
-      const response = await fetch(`${API_BASE_URL}/analytics?dateRange=${dateRange}`);
+      const enhancedRange = rangeMap[range] || '30d';
+      const response = await fetch(`${API_BASE_URL}/analytics/enhanced?range=${enhancedRange}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -75,9 +119,29 @@ export class LixetaAPI {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
-      // Return mock data for demo purposes
-      return this.getMockAnalyticsData();
+      console.error('Failed to fetch enhanced analytics:', error);
+      try {
+        // Fallback to old analytics endpoint
+        const dateRangeMap: Record<string, string> = {
+          '7d': 'last7Days',
+          '30d': 'last30Days',
+          '90d': 'last90Days'
+        };
+        
+        const dateRange = dateRangeMap[range] || 'last30Days';
+        const response = await fetch(`${API_BASE_URL}/analytics?dateRange=${dateRange}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data;
+      } catch (fallbackError) {
+        console.error('Failed to fetch analytics:', fallbackError);
+        // Return mock data for demo purposes
+        return this.getMockAnalyticsData();
+      }
     }
   }
 

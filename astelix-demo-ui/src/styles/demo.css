@@ -368,3 +368,118 @@ body {
         transform: translateY(0);
     }
 }
+
+/* Enhanced Components Styling */
+.channel-context-display {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.context-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(79, 70, 229, 0.1);
+    border: 1px solid rgba(79, 70, 229, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.context-badge .badge-label {
+    color: #9ca3af;
+    font-weight: 600;
+}
+
+.context-badge .badge-value {
+    color: #60a5fa;
+    font-weight: 500;
+}
+
+.why-happened-display {
+    background: rgba(34, 197, 94, 0.05);
+    border-left: 3px solid #22c55e;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+.why-happened-display .why-text {
+    color: #d1d5db;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.why-happened-display .duration-badge {
+    display: inline-block;
+    background: #22c55e;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.webhook-instruction-display {
+    background: rgba(59, 130, 246, 0.05);
+    border-left: 3px solid #3b82f6;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.webhook-instruction-display .instruction-header {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.webhook-instruction-display .action-badge {
+    background: #3b82f6;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.webhook-instruction-display .urgency-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.webhook-instruction-display .urgency-critical {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.webhook-instruction-display .urgency-high {
+    background: rgba(249, 115, 22, 0.2);
+    color: #f97316;
+}
+
+.webhook-instruction-display .urgency-medium {
+    background: rgba(234, 179, 8, 0.2);
+    color: #eab308;
+}
+
+.webhook-instruction-display .urgency-low {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.webhook-instruction-display .instruction-details {
+    color: #d1d5db;
+    font-size: 13px;
+}
+
+.webhook-instruction-display .detail-line {
+    margin: 4px 0;
+}

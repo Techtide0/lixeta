@@ -10,6 +10,19 @@ export interface TimelineStep {
   color: 'green' | 'yellow' | 'red' | 'blue' | 'purple' | 'gray';
   details: string;
   critical?: boolean;
+  // Enhanced fields
+  whyHappened?: string;
+  processingDuration?: string;
+  channelContext?: {
+    channel: 'SMS' | 'Email' | 'Push' | 'Webhook';
+    status: 'sent' | 'delayed' | 'skipped' | 'simulated';
+  };
+  webhookInstruction?: {
+    action: string;
+    urgency: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    reason: string;
+    recommendedTime: string;
+  };
 }
 
 export interface TimelineTrigger {
@@ -83,4 +96,71 @@ export interface AnalyticsData {
   topRules: RuleTriggered[];
   costAnalysis: CostAnalysis;
   recentActivity: RecentActivity[];
+}
+// Enhanced Interfaces
+export interface ActiveHoursStatus {
+  isWithinHours: boolean;
+  currentLocalTime: string;
+  window: string;
+  status: 'delayed' | 'sent' | 'scheduled';
+  deliveryTime?: string;
+  engagementLikelihood?: number;
+}
+
+export interface BehaviorFlow {
+  flowId: string;
+  name: string;
+  steps: {
+    stepNumber: number;
+    action: string;
+    condition: string;
+    outcome: string;
+    suppressed?: boolean;
+    reason?: string;
+  }[];
+}
+
+export interface ChannelOrchestration {
+  channels: ('SMS' | 'Email' | 'Push' | 'Webhook')[];
+  primary: 'SMS' | 'Email' | 'Push' | 'Webhook';
+  fallback?: 'SMS' | 'Email' | 'Push' | 'Webhook';
+}
+
+export interface SuppressionMetrics {
+  messagesAvoided: number;
+  quietHoursSuppression: number;
+  fatigueSuppression: number;
+}
+
+export interface EngagementEvents {
+  clicked: number;
+  ignored: number;
+  responded: number;
+}
+
+export interface ROIComparison {
+  withoutLixeta: {
+    messagesSent: number;
+    estimatedCost: number;
+  };
+  withLixeta: {
+    messagesSent: number;
+    estimatedCost: number;
+    savings: number;
+  };
+}
+
+export interface EnhancedAnalyticsData extends AnalyticsData {
+  eventId?: string;
+  eventType?: 'payment.failed' | 'transfer.reversal_requested' | 'login.new_device' | 'active_hours_event' | 'user.no_response';
+  trigger?: TimelineTrigger;
+  steps?: TimelineStep[];
+  metrics?: TimelineMetrics;
+  activeHours?: ActiveHoursStatus;
+  behaviorFlow?: BehaviorFlow;
+  channelOrchestration?: ChannelOrchestration;
+  suppressionMetrics?: SuppressionMetrics;
+  engagementEvents?: EngagementEvents;
+  roiComparison?: ROIComparison;
+  timeRange?: '7d' | '30d' | '90d';
 }

@@ -5,6 +5,8 @@ import { ChevronRight, ChevronLeft, Info } from 'lucide-react';
 import { LixetaAPI } from '../services/api';
 import { TimelineData } from '../types/timeline';
 import { ScenarioId } from '../components/ScenarioSelector.tsx';
+import { WhyThisHappened } from '../components/WhyThisHappened';
+import { WebhookInstruction } from '../components/WebhookInstruction';
 
 interface TimelinePageProps {
   selectedScenario?: ScenarioId | null;
@@ -23,7 +25,7 @@ const TimelinePage: React.FC<TimelinePageProps> = ({ selectedScenario = null }) 
   const fetchTimeline = async () => {
     try {
       setLoading(true);
-      let data: TimelineData;
+      let data: TimelineData | null = null;
       
       if (selectedScenario) {
         data = await LixetaAPI.fetchTimelineForScenario(selectedScenario);
@@ -31,12 +33,18 @@ const TimelinePage: React.FC<TimelinePageProps> = ({ selectedScenario = null }) 
         data = await LixetaAPI.fetchLatestTimeline();
       }
       
-      setTimelineData(data);
-      setCurrentStep(0);
-      setSelectedEvent(null);
+      if (data && data.steps && data.trigger) {
+        setTimelineData(data);
+        setCurrentStep(0);
+        setSelectedEvent(null);
+      } else {
+        console.error('Invalid timeline data received:', data);
+        setTimelineData(null);
+      }
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch timeline:', error);
+      setTimelineData(null);
       setLoading(false);
     }
   };
@@ -93,6 +101,18 @@ const TimelinePage: React.FC<TimelinePageProps> = ({ selectedScenario = null }) 
       <div className="timeline-page">
         <div className="empty-state">
           <p>No timeline data available</p>
+          <button onClick={fetchTimeline} className="reload-btn">Reload</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Safety check - ensure trigger and steps exist
+  if (!timelineData.trigger || !timelineData.steps) {
+    return (
+      <div className="timeline-page">
+        <div className="empty-state">
+          <p>Invalid timeline data structure</p>
           <button onClick={fetchTimeline} className="reload-btn">Reload</button>
         </div>
       </div>
@@ -181,10 +201,49 @@ const TimelinePage: React.FC<TimelinePageProps> = ({ selectedScenario = null }) 
                   {new Date(timelineData.steps[selectedEvent].timestamp).toLocaleString()} ({timelineData.trigger.userTimezone})
                 </p>
               </div>
+              
               <div className="panel-section">
                 <h4>Explanation</h4>
                 <p>{timelineData.steps[selectedEvent].details}</p>
               </div>
+
+              {timelineData.steps[selectedEvent].whyHappened && (
+                <div className="panel-section">
+                  <WhyThisHappened
+                    why={timelineData.steps[selectedEvent].whyHappened || ''}
+                    processingDuration={timelineData.steps[selectedEvent].processingDuration}
+                  />
+                </div>
+              )}
+
+              {timelineData.steps[selectedEvent].channelContext && (
+                <div className="panel-section">
+                  <h4>Channel Context</h4>
+                  <div className="channel-context-display">
+                    <div className="context-badge">
+                      <span className="badge-label">Channel:</span>
+                      <span className="badge-value">{timelineData.steps[selectedEvent].channelContext?.channel}</span>
+                    </div>
+                    <div className="context-badge">
+                      <span className="badge-label">Status:</span>
+                      <span className="badge-value">{timelineData.steps[selectedEvent].channelContext?.status}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {timelineData.steps[selectedEvent].webhookInstruction && (
+                <div className="panel-section">
+                  <WebhookInstruction
+                    instruction={{
+                      action: timelineData.steps[selectedEvent].webhookInstruction?.action || 'N/A',
+                      urgency: (timelineData.steps[selectedEvent].webhookInstruction?.urgency || 'LOW') as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
+                      reason: timelineData.steps[selectedEvent].webhookInstruction?.reason || 'N/A',
+                      recommendedTime: timelineData.steps[selectedEvent].webhookInstruction?.recommendedTime || '',
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
